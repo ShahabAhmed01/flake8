@@ -28,6 +28,7 @@ class Violation(NamedTuple):
     column_number: int
     text: str
     physical_line: str | None
+    noqa_line: str | None = None
 
     def is_inline_ignored(self, disable_noqa: bool) -> bool:
         """Determine if a comment has been added to ignore this line.
@@ -37,14 +38,20 @@ class Violation(NamedTuple):
         :returns:
             True if error is ignored in-line, False otherwise.
         """
-        physical_line = self.physical_line
-        # TODO(sigmavirus24): Determine how to handle stdin with linecache
         if disable_noqa:
             return False
 
-        if physical_line is None:
-            physical_line = linecache.getline(self.filename, self.line_number)
-        noqa_match = _find_noqa(physical_line)
+        noqa_line = self.noqa_line
+        if noqa_line is None:
+            # The comments of the line are not known, fall back to the
+            # physical line.
+            # TODO(sigmavirus24): Determine how to handle stdin with
+            # linecache
+            noqa_line = self.physical_line
+            if noqa_line is None:
+                noqa_line = linecache.getline(self.filename, self.line_number)
+
+        noqa_match = _find_noqa(noqa_line)
         if noqa_match is None:
             LOG.debug("%r is not inline ignored", self)
             return False

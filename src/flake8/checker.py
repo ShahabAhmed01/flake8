@@ -26,7 +26,7 @@ from flake8.plugins.finder import Checkers
 from flake8.plugins.finder import LoadedPlugin
 from flake8.style_guide import StyleGuideManager
 
-Results = list[tuple[str, int, int, str, Optional[str]]]
+Results = list[tuple[str, int, int, str, Optional[str], Optional[str]]]
 
 LOG = logging.getLogger(__name__)
 
@@ -160,7 +160,14 @@ class Manager:
     def _handle_results(self, filename: str, results: Results) -> int:
         style_guide = self.style_guide
         reported_results_count = 0
-        for error_code, line_number, column, text, physical_line in results:
+        for (
+            error_code,
+            line_number,
+            column,
+            text,
+            physical_line,
+            noqa_line,
+        ) in results:
             reported_results_count += style_guide.handle_error(
                 code=error_code,
                 filename=filename,
@@ -168,6 +175,7 @@ class Manager:
                 column_number=column,
                 text=text,
                 physical_line=physical_line,
+                noqa_line=noqa_line,
             )
         return reported_results_count
 
@@ -321,10 +329,14 @@ class FileChecker:
         # have this attribute.
         if hasattr(self, "processor") and self.processor is not None:
             line = self.processor.noqa_line_for(line_number)
+            noqa_line = self.processor.noqa_comment_for(line_number)
         else:
             line = None
+            noqa_line = None
 
-        self.results.append((error_code, line_number, column, text, line))
+        self.results.append(
+            (error_code, line_number, column, text, line, noqa_line),
+        )
         return error_code
 
     def run_check(self, plugin: LoadedPlugin, **arguments: Any) -> Any:

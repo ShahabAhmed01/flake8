@@ -14,7 +14,7 @@ PHYSICAL_LINE = "# Physical line content"
 
 EXPECTED_REPORT = (1, 1, "T000 Expected Message")
 EXPECTED_REPORT_PHYSICAL_LINE = (1, "T000 Expected Message")
-EXPECTED_RESULT_PHYSICAL_LINE = ("T000", 0, 1, "Expected Message", None)
+EXPECTED_RESULT_PHYSICAL_LINE = ("T000", 0, 1, "Expected Message", None, None)
 
 
 class PluginClass:
@@ -170,7 +170,7 @@ def test_logical_line_offset_out_of_bounds():
         return_value=logical_ret,
     ):
         file_checker.run_logical_checks()
-        assert file_checker.results == [("L100", 0, 0, "test", None)]
+        assert file_checker.results == [("L100", 0, 0, "test", None, None)]
 
 
 PLACEHOLDER_CODE = 'some_line = "of" * code'

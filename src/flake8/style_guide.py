@@ -265,6 +265,7 @@ class StyleGuideManager:
         column_number: int,
         text: str,
         physical_line: str | None = None,
+        noqa_line: str | None = None,
     ) -> int:
         """Handle an error reported by a check.
 
@@ -282,6 +283,8 @@ class StyleGuideManager:
             The text of the error message.
         :param physical_line:
             The actual physical line causing the error.
+        :param noqa_line:
+            The comments of the line which may contain a ``noqa`` directive.
         :returns:
             1 if the error was reported. 0 if it was ignored. This is to allow
             for counting of the number of errors found that were not ignored.
@@ -289,6 +292,7 @@ class StyleGuideManager:
         guide = self.style_guide_for(filename)
         return guide.handle_error(
             code, filename, line_number, column_number, text, physical_line,
+            noqa_line,
         )
 
 
@@ -380,6 +384,7 @@ class StyleGuide:
         column_number: int,
         text: str,
         physical_line: str | None = None,
+        noqa_line: str | None = None,
     ) -> int:
         """Handle an error reported by a check.
 
@@ -397,6 +402,8 @@ class StyleGuide:
             The text of the error message.
         :param physical_line:
             The actual physical line causing the error.
+        :param noqa_line:
+            The comments of the line which may contain a ``noqa`` directive.
         :returns:
             1 if the error was reported. 0 if it was ignored. This is to allow
             for counting of the number of errors found that were not ignored.
@@ -413,6 +420,7 @@ class StyleGuide:
             column_number + 1,
             text,
             physical_line,
+            noqa_line,
         )
         error_is_selected = (
             self.should_report_error(error.code) is Decision.Selected

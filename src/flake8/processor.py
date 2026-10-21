@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import collections
 import functools
 import logging
 import tokenize
@@ -283,6 +284,25 @@ class FileProcessor:
         joined = "".join(self.lines[min_line - 1: max_line])
         return dict.fromkeys(line_range, joined)
 
+    def _noqa_line_ranges(
+        self, file_tokens: list[tokenize.TokenInfo],
+    ) -> Generator[tuple[int, int]]:
+        """Yield the (min_line, max_line) ranges of the logical lines."""
+        min_line = len(self.lines) + 2
+        max_line = -1
+        for tp, _, (s_line, _), (e_line, _), _ in file_tokens:
+            if tp == tokenize.ENDMARKER or tp == tokenize.DEDENT:
+                continue
+
+            min_line = min(min_line, s_line)
+            max_line = max(max_line, e_line)
+
+            if tp in (tokenize.NL, tokenize.NEWLINE):
+                yield min_line, max_line
+
+                min_line = len(self.lines) + 2
+                max_line = -1
+
     @functools.cached_property
     def _noqa_line_mapping(self) -> dict[int, str]:
         """Map from line number to the line we'll search for `noqa` in."""
@@ -295,22 +315,41 @@ class FileProcessor:
         else:
             ret = {}
 
-            min_line = len(self.lines) + 2
-            max_line = -1
-            for tp, _, (s_line, _), (e_line, _), _ in file_tokens:
-                if tp == tokenize.ENDMARKER or tp == tokenize.DEDENT:
-                    continue
-
-                min_line = min(min_line, s_line)
-                max_line = max(max_line, e_line)
-
-                if tp in (tokenize.NL, tokenize.NEWLINE):
-                    ret.update(self._noqa_line_range(min_line, max_line))
-
-                    min_line = len(self.lines) + 2
-                    max_line = -1
+            for min_line, max_line in self._noqa_line_ranges(file_tokens):
+                ret.update(self._noqa_line_range(min_line, max_line))
 
             return ret
+
+    @functools.cached_property
+    def _noqa_comment_mapping(self) -> dict[int, str]:
+        """Map from line number to the comments we'll search for `noqa` in.
+
+        Only the text of ``COMMENT`` tokens is considered, so a ``# noqa``
+        which is part of a string literal does not silence a violation.
+        """
+        try:
+            file_tokens = self.file_tokens
+        except (tokenize.TokenError, SyntaxError):
+            # if we failed to parse the file tokens, we'll always fail in
+            # the future, so set this so the code does not try again
+            return {}
+
+        comments: dict[int, list[str]] = collections.defaultdict(list)
+        for tp, text, (s_line, _), (e_line, _), _ in file_tokens:
+            if tp == tokenize.COMMENT:
+                for line in range(s_line, e_line + 1):
+                    comments[line].append(text)
+
+        ret = {}
+        for min_line, max_line in self._noqa_line_ranges(file_tokens):
+            joined = "".join(
+                "".join(comments.get(line, ()))
+                for line in range(min_line, max_line + 1)
+            )
+            for line in range(min_line, max_line + 1):
+                ret[line] = joined
+
+        return ret
 
     def noqa_line_for(self, line_number: int) -> str | None:
         """Retrieve the line which will be used to determine noqa."""
@@ -318,6 +357,15 @@ class FileProcessor:
         # files on Line 1. In those cases, we shouldn't bother trying to
         # retrieve a physical line (since none exist).
         return self._noqa_line_mapping.get(line_number)
+
+    def noqa_comment_for(self, line_number: int) -> str | None:
+        """Retrieve the comments which will be used to determine noqa.
+
+        ``None`` is returned when the line is not part of a logical line we
+        could tokenize, in which case the caller should fall back to the
+        physical line.
+        """
+        return self._noqa_comment_mapping.get(line_number)
 
     def next_line(self) -> str:
         """Get the next line from the list."""

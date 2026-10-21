@@ -259,6 +259,42 @@ x = """
     assert out == err == ""
 
 
+def test_noqa_in_a_string_is_not_a_noqa(tmpdir, capsys):
+    """A ``# noqa`` inside a string does not ignore the error.
+
+    See https://github.com/PyCQA/flake8/issues/1321.
+    """
+    t_py_src = '''\
+def f():
+    x = "# noqa"
+'''
+
+    with tmpdir.as_cwd():
+        tmpdir.join("t.py").write(t_py_src)
+        assert cli.main(["t.py"]) == 1
+
+    expected = """\
+t.py:2:5: F841 local variable 'x' is assigned to but never used
+"""
+    out, err = capsys.readouterr()
+    assert out == expected
+
+
+def test_noqa_comment_next_to_a_string_is_a_noqa(tmpdir, capsys):
+    """A real ``# noqa`` comment still ignores the error."""
+    t_py_src = '''\
+def f():
+    x = "# noqa"  # noqa
+'''
+
+    with tmpdir.as_cwd():
+        tmpdir.join("t.py").write(t_py_src)
+        assert cli.main(["t.py"]) == 0
+
+    out, err = capsys.readouterr()
+    assert out == err == ""
+
+
 def test_physical_line_file_not_ending_in_newline(tmpdir, capsys):
     """See https://github.com/PyCQA/pycodestyle/issues/960."""
     t_py_src = "def f():\n\tpass"

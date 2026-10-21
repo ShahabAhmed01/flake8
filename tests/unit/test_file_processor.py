@@ -178,6 +178,44 @@ world
     assert file_processor.noqa_line_for(8) is None
 
 
+def test_noqa_comment_for(default_options):
+    """Verify that only comments are used to determine ``noqa``."""
+    file_processor = processor.FileProcessor(
+        "-",
+        default_options,
+        lines=[
+            "x = '# noqa'\n",
+            "x = 1  # noqa\n",
+        ],
+    )
+
+    # the string is not a comment, so it can not turn into a noqa directive
+    assert file_processor.noqa_comment_for(1) == ""
+    assert file_processor.noqa_comment_for(2) == "# noqa"
+
+
+def test_noqa_comment_for_continuation(default_options):
+    """Verify that the comments of a continuation are used."""
+    src = '''\
+from foo \\
+    import bar  # 2
+
+x = """
+hello
+world
+"""  # 7
+'''
+    lines = src.splitlines(True)
+    file_processor = processor.FileProcessor("-", default_options, lines=lines)
+
+    assert file_processor.noqa_comment_for(1) == "# 2"
+    assert file_processor.noqa_comment_for(2) == "# 2"
+    assert file_processor.noqa_comment_for(3) == ""
+    assert file_processor.noqa_comment_for(4) == "# 7"
+    for i in (5, 6, 7):
+        assert file_processor.noqa_comment_for(i) == "# 7"
+
+
 def test_noqa_line_for_no_eol_at_end_of_file(default_options):
     """Verify that we properly handle noqa line at the end of the file."""
     src = "from foo \\\nimport bar"  # no end of file newline
